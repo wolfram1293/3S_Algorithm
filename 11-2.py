@@ -1,85 +1,73 @@
-V=100
+import sys
+#スタートから各文字列に流量a、コストiのエッジ、各文字列から各アルファベットに流量(各文字列中の各アルファベットの数)、コスト0のエッジ、
+#各アルファベットからゴールに流量(各アルファベットの必要数)、コスト0のエッジを引き、プライマルデュアル法により最小費用流を求める
+def main(lines):
 
-def BellmanFord(V, e_list):
-    inf = 10**9
-    dist = [inf]*V
-    dist[0] = 0
-    for j in range(V):
-        for e in e_list:
-            if dist[e[1]] > e[2] + dist[e[0]]:
-                dist[e[1]] = e[2] + dist[e[0]]
-                # 負の閉路の検知
-                if j==V-1: return -1
-    print(dist)
+    def add_edge(f,t,cap,cost): #グラフのエッジを追加する関数
+        G[f].append([t,cap,cost,len(G[t])])
+        G[t].append([f,0,-cost,len(G[f])-1])
 
-edges_list2 = [[0, 1, 5], [0, 2, 4], [1, 0, 5], [1, 3, 9], [1, 5, 9],
-[2, 0, 4], [2, 3, 2], [2, 4, 3], [3, 1, 9], [3, 2, 2], [3, 5, 1], [3, 6, 7],
-[4, 2, 3], [4, 6, 8], [5, 1, 9], [5, 3, 1], [5, 6, 2], [5, 7, 5], [6, 3, 7],
-[6, 4, 8], [6, 5, 2], [6, 7, 2], [7, 5, 5], [7, 6, 2]]
+    def min_cost_flow(s,t,f): #最小費用流を求める関数
+        res = 0
+        while f > 0:
+            #ベルマンフォード法で最短路を求める
+            dist=[INF]*V; #最短距離
+            dist[s] = 0
+            update = True
+            while update:
+                update = False
+                for v in range(V):
+                    if dist[v] == INF: continue
+                    for i in range(len(G[v])):
+                        if G[v][i][1] > 0 and dist[G[v][i][0]] > dist[v] + G[v][i][2]: #最短距離を更新
+                            dist[G[v][i][0]] = dist[v] + G[v][i][2]
+                            prev_v[G[v][i][0]] = v #直前の頂点、辺も記録
+                            prev_e[G[v][i][0]] = i
+                            update = True
 
-def min_cost_flow(s,t,f):
-    res = 0
-    while f > 0:
-        # ベルマンフォード法により、s-t間最短路を求める
-        dist=[INF]*V; # 最短距離
-        dist[s] = 0
-        update = True
-        while update:
-            update = False
-            for v in range(V):
-                if dist[v] == INF: continue
-                for i in range(len(G[v])):
-                    if G[v][i][1] > 0 and dist[G[v][i][0]] > dist[v] + G[v][i][2]:
-                        dist[G[v][i][0]] = dist[v] + G[v][i][2]
-                        prev_v[G[v][i][0]] = v
-                        prev_e[G[v][i][0]] = i
-                        update = True
+            if dist[t] == INF: #これ以上流せないなら-1
+                return -1
 
-        if dist[t] == INF:
-            # これ以上流せない
-            return -1
-
-        # s-t間最短路に沿って目一杯流す
-        d = f
-        v = t
-        while  v != s:
-            d = min(d, G[prev_v[v]][prev_e[v]][1])
-            v = prev_v[v]
-        
-        f -= d
-        res += d*dist[t]
-        v = t
-        while  v != s:
-            G[prev_v[v]][prev_e[v]][1] -= d
-            G[v][G[prev_v[v]][prev_e[v]][3]][1] += d
-            v = prev_v[v]
+            d = f #流量
+            v = t
+            #最短路に沿ってできる限り流すというのを繰り返す
+            while  v != s:
+                d = min(d, G[prev_v[v]][prev_e[v]][1])
+                v = prev_v[v]
             
-    return res
+            f -= d
+            res += d*dist[t]
+            v = t
+            while  v != s:
+                G[prev_v[v]][prev_e[v]][1] -= d
+                G[v][G[prev_v[v]][prev_e[v]][3]][1] += d
+                v = prev_v[v]
+                
+        return res
 
+    T=lines[0]
+    N=int(lines[1])
+    INF=10**9
+    V=1+N+26+1 #頂点数
+    G=[[] for i in range(V)] #グラフ
+    prev_v=[0 for i in range(V)] #直前の頂点
+    prev_e=[0 for i in range(V)] #直前の辺
+    for i in range(N):
+        s,a=[x.strip() for x in lines[i+2].split()]
+        add_edge(0,i+1, int(a), i+1) #スタートから各文字列に流量a、コストiのエッジを引く
+        for j in range(26):
+            if s.count(chr(ord('a')+j))!=0:
+                add_edge(i+1,N+1+j, s.count(chr(ord('a')+j)), 0) #各文字列から各アルファベットに流量(各文字列中の各アルファベットの数)、コスト0のエッジを引く
 
+    for i in range(26):
+        if T.count(chr(ord('a')+i))!=0:
+            add_edge(N+1+i,V-1, T.count(chr(ord('a')+i)), 0) #各アルファベットからゴールに流量(各アルファベットの必要数)、コスト0のエッジを引く
 
-def add_edge(f,t,cap,cost):
-    G[f].append([t,cap,cost,len(G[t])])
-    G[t].append([f,0,-cost,len(G[f])-1])
+    print(min_cost_flow(0,V-1,len(T))) #プライマルデュアル法を実行
 
-INF=10**9
-V=4 # 頂点数
-G=[[] for i in range(V)] # グラフの隣接リスト表現
-
-prev_v=[0 for i in range(V)]
-prev_e=[0 for i in range(V)] # 直前の頂点と辺
-
-add_edge(0,1, 3, 6)
-add_edge(0,2, 5, 2)
-add_edge(1,3, 4, 3)
-add_edge(2,1, 7, 3)
-add_edge(2,3, 6, 9)
-
-
-
-# 辺を表す構造体 (行き先、容量、コスト、逆辺)
-
-#G = [[[1, 3, 6], [2, 5, 2]], [[3, 4, 3]],[[1, 7, 3], [3, 6, 9]],[]]
-# sからtへの流量fの最小費用流を求める
-# 流せない場合は-1を返す
-min_cost_flow(0,3,7)
+if __name__ == '__main__':
+    lines = []
+    for l in sys.stdin:
+        lines.append(l.rstrip('\r\n'))
+    main(lines)
+    
